@@ -1,0 +1,7 @@
+Name,TailscaleIP
+# Ekhane protita France phone-er line add koro.
+# Format:  NAME,TAILSCALE_IP   (port lagbe na, 5555 auto)
+# Tailscale IP paba: phone-er Tailscale app > device-er "100.x.x.x" address
+# Example:
+# Phone-01,100.101.102.103
+# Phone-02,100.104.105.106

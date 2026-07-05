@@ -1,0 +1,12 @@
+node_modules/
+dist/
+out/
+*.log
+.DS_Store
+Thumbs.db
+# generated per-phone launchers
+Open-*.bat
+# local device list (keep the tracked template only)
+/phones.local.csv
+# bundled binaries (users install via winget or Setup panel)
+dashboard/vendor/

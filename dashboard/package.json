@@ -1,0 +1,44 @@
+{
+  "name": "phone-control-dashboard",
+  "version": "1.0.0",
+  "description": "Control your Android phones (scrcpy) and PCs (RDP) over Tailscale from one dashboard",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "pack": "electron-builder --dir"
+  },
+  "author": "mdnishath",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.mdnishath.phonecontrol",
+    "productName": "Phone Control",
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "!preview.html",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": [
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "portable": {
+      "artifactName": "PhoneControl-portable-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "artifactName": "PhoneControl-Setup-${version}.exe"
+    }
+  }
+}
