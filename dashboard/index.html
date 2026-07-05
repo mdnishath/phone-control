@@ -344,7 +344,7 @@ async function refresh(){
     const res=await window.api.control(ip,title,q,os);
     b.disabled=false; b.textContent=label;
     const what = res.mode==='rdp' ? 'Remote Desktop khullo — laptop-er login diye dhuko' : `scrcpy chalu (${res.mode||q})`;
-    toast(res.ok?what:('Error: '+res.error));
+    if(res.ok) toast(what); else toast('⚠️ '+res.error, 9000);
   }));
 }
 

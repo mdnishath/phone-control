@@ -113,16 +113,50 @@ ipcMain.handle('device:control', async (_e, ip, title, quality, os) => {
   const { dir, adb, scrcpy } = paths();
   if (!scrcpy) return { ok: false, error: 'scrcpy install nai. Setup panel theke install koro.' };
   const target = `${ip}:5555`;
-  await run(adb, ['connect', target], 6000);
+
+  // Force scrcpy + adb to use THE SAME adb (onno PC-te alada adb version mismatch = connection kill).
+  const env = { ...process.env, ADB: adb, ADB_SERVER_SOCKET: 'tcp:127.0.0.1:5037' };
+  const runEnv = (c, a, t) => new Promise(res => execFile(c, a, { timeout: t, maxBuffer: 1 << 20, windowsHide: true, env }, (err, so, se) => res({ err, out: (so || '') + (se || '') })));
+
+  await runEnv(adb, ['connect', target], 8000);
+  // device readyness check (unauthorized / offline handle)
+  const dl = (await runEnv(adb, ['devices'], 6000)).out;
+  const row = dl.split('\n').find(l => l.startsWith(target)) || '';
+  if (!row.includes('\tdevice') && !/\bdevice\b/.test(row.replace(target, ''))) {
+    if (row.includes('unauthorized'))
+      return { ok: false, error: 'Phone-e "Allow USB debugging" popup ta OK koro (ei PC prothombar connect korche). Tarpor abar Control.' };
+    return { ok: false, error: 'Phone reachable na (' + target + '). Check: Tailscale ON same account? tcpip 5555 phone-e enable? Wi-Fi te?' };
+  }
+
   let mode = quality;
   if (!mode || mode === 'auto') mode = await autoMode(ip);
   const args = ['-s', target, `--window-title=${title || ip}`, ...qualityArgs(mode),
     '--stay-awake', '--turn-screen-off', '--power-off-on-close'];
+
+  // scrcpy output ke log file-e likhi jate crash hole asol error dekhা jay
+  let logFd = 'ignore';
+  const logPath = path.join(app.getPath('userData'), 'scrcpy-last.log');
+  try { logFd = fs.openSync(logPath, 'w'); } catch {}
+  let child;
   try {
-    const child = spawn(scrcpy, args, { detached: true, stdio: 'ignore', cwd: dir });
-    child.unref();
-    return { ok: true, mode };
-  } catch (e) { return { ok: false, error: String(e) }; }
+    child = spawn(scrcpy, args, { detached: true, windowsHide: true, cwd: dir, env, stdio: ['ignore', logFd, logFd] });
+  } catch (e) { return { ok: false, error: 'scrcpy start fail: ' + e }; }
+
+  // 3.5s-er moddhe crash korle asol error UI te pathai
+  const exitCode = await new Promise(res => {
+    let done = false;
+    child.on('error', () => { if (!done) { done = true; res('spawn-error'); } });
+    child.on('exit', c => { if (!done) { done = true; res(c); } });
+    setTimeout(() => { if (!done) { done = true; res('alive'); } }, 3500);
+  });
+  if (exitCode !== 'alive') {
+    let log = '';
+    try { log = fs.readFileSync(logPath, 'utf8'); } catch {}
+    const tail = log.split('\n').map(s => s.trim()).filter(Boolean).slice(-4).join('  |  ');
+    return { ok: false, error: 'scrcpy bondho holo. ' + (tail || ('exit ' + exitCode)) };
+  }
+  child.unref();
+  return { ok: true, mode };
 });
 
 ipcMain.handle('device:ping', async (_e, ip) => {

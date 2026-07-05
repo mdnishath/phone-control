@@ -1,6 +1,6 @@
 {
   "name": "phone-control-dashboard",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Control your Android phones (scrcpy) and PCs (RDP) over Tailscale from one dashboard",
   "main": "main.js",
   "scripts": {
