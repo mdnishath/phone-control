@@ -154,9 +154,11 @@ ipcMain.handle('device:control', async (_e, ip, title, quality, os) => {
   let logFd = 'ignore';
   const logPath = path.join(app.getPath('userData'), 'scrcpy-last.log');
   try { logFd = fs.openSync(logPath, 'w'); } catch {}
+  // NOTE: detached NA (windowsHide + no-detached = CREATE_NO_WINDOW -> Windows 11 Terminal
+  // console window ar khulবে na). scrcpy app khola thakle chalte thakে (main process alive).
   let child;
   try {
-    child = spawn(scrcpy, args, { detached: true, windowsHide: true, cwd: dir, env, stdio: ['ignore', logFd, logFd] });
+    child = spawn(scrcpy, args, { windowsHide: true, cwd: dir, env, stdio: ['ignore', logFd, logFd] });
   } catch (e) { return { ok: false, error: 'scrcpy start fail: ' + e }; }
 
   // 3.5s-er moddhe crash korle asol error UI te pathai
