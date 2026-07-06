@@ -45,6 +45,21 @@ function run(cmd, args, timeout = 8000) {
   });
 }
 
+// Onno PC-te alada adb (Android Studio / emulator / phone-manager) default port 5037-e
+// conflict kore -> server "war" -> cmd window flash + scrcpy connection kete jay.
+// Tai amader app SHUDHU nijer isolated port e adb server chalay (kono conflict nai).
+const ADB_PORT = '5556';
+const ADB_SOCK = 'tcp:127.0.0.1:5556';
+// env: scrcpy ei socket diye amader isolated server-e connect korবে (ADB_SERVER_SOCKET).
+function adbEnv(adb) { return { ...process.env, ADB: adb, ADB_SERVER_SOCKET: ADB_SOCK }; }
+// -P <port>: amader adb command isolated server e chalay (env dic diye server START hoy na, -P diye hoy).
+function runAdb(adb, args, timeout = 8000) {
+  return new Promise((resolve) => {
+    execFile(adb, ['-P', ADB_PORT, ...args], { timeout, maxBuffer: 1 << 20, windowsHide: true, env: adbEnv(adb) },
+      (err, so, se) => resolve({ err, out: (so || '') + (se || '') }));
+  });
+}
+
 async function tsStatus() {
   if (!fs.existsSync(TS)) return null;
   const { out } = await run(TS, ['status', '--json'], 8000);
@@ -54,10 +69,10 @@ async function tsStatus() {
 // adb connect + model / android / battery (online android only)
 async function enrich(ip, adb) {
   const target = `${ip}:5555`;
-  await run(adb, ['connect', target], 6000);
-  const model = (await run(adb, ['-s', target, 'shell', 'getprop', 'ro.product.model'], 6000)).out.trim();
-  const rel = (await run(adb, ['-s', target, 'shell', 'getprop', 'ro.build.version.release'], 6000)).out.trim();
-  const batt = (await run(adb, ['-s', target, 'shell', 'dumpsys', 'battery'], 5000)).out;
+  await runAdb(adb, ['connect', target], 6000);
+  const model = (await runAdb(adb, ['-s', target, 'shell', 'getprop', 'ro.product.model'], 6000)).out.trim();
+  const rel = (await runAdb(adb, ['-s', target, 'shell', 'getprop', 'ro.build.version.release'], 6000)).out.trim();
+  const batt = (await runAdb(adb, ['-s', target, 'shell', 'dumpsys', 'battery'], 5000)).out;
   const m = batt.match(/level:\s*(\d+)/);
   return { model, android: rel, battery: m ? m[1] : '', reachable: !!model };
 }
@@ -114,13 +129,15 @@ ipcMain.handle('device:control', async (_e, ip, title, quality, os) => {
   if (!scrcpy) return { ok: false, error: 'scrcpy install nai. Setup panel theke install koro.' };
   const target = `${ip}:5555`;
 
-  // Force scrcpy + adb to use THE SAME adb (onno PC-te alada adb version mismatch = connection kill).
-  const env = { ...process.env, ADB: adb, ADB_SERVER_SOCKET: 'tcp:127.0.0.1:5037' };
-  const runEnv = (c, a, t) => new Promise(res => execFile(c, a, { timeout: t, maxBuffer: 1 << 20, windowsHide: true, env }, (err, so, se) => res({ err, out: (so || '') + (se || '') })));
+  // scrcpy + adb ke amader ISOLATED adb server (port 5556) e badhi -> system-er onno
+  // adb-r sathe conflict nai -> cmd flash + connection-kill bondho.
+  const env = adbEnv(adb); // scrcpy ei env (ADB_SERVER_SOCKET) diye already-running 5556 server e dhukbে
 
-  await runEnv(adb, ['connect', target], 8000);
+  // amader isolated server ta age hidden vabে chalu kori (scrcpy jate notun console na khole)
+  await runAdb(adb, ['start-server'], 8000);
+  await runAdb(adb, ['connect', target], 8000);
   // device readyness check (unauthorized / offline handle)
-  const dl = (await runEnv(adb, ['devices'], 6000)).out;
+  const dl = (await runAdb(adb, ['devices'], 6000)).out;
   const row = dl.split('\n').find(l => l.startsWith(target)) || '';
   if (!row.includes('\tdevice') && !/\bdevice\b/.test(row.replace(target, ''))) {
     if (row.includes('unauthorized'))
